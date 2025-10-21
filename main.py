@@ -1,19 +1,36 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import re
-import time
+
+GROWTH_IN_CLICKS_BEFORE_NEXT_CLICK_PASS = 1.03
 
 def click_on_cookie(seldriver, num_clicks):
     elem_cookie_btn = seldriver.find_element(By.ID, "bigCookie")
     for n in range(0, num_clicks):
-        elem_cookie_btn.click()
+        try:
+            elem_cookie_btn.click()
+        except Exception:
+            # selenium.common.exceptions.ElementClickInterceptedException: Message: element click intercepted:
+            # Element < button id = "bigCookie" > < / button > is not clickable
+            # at zpoint(206, 539).
+            #
+            # Other element would receive the click:
+            # < div class ="shimmer" alt="Golden cookie" style="left: 115px; top: 434px; width: 96px; height: 96px; background-image: url(&quot;img/goldCookie.png&quot;); background-position: 0px 0px; opacity: 0.865912; display: block; transform: rotate(-13.7111deg) scale(1.03691);" > < / div >
+            #
+            # (Session info: chrome=141.0.7390.107);
+            # For documentation on this error, please
+            # visit: https: // www.selenium.dev / documentation / webdriver / troubleshooting / errors  # elementclickinterceptedexception
+            driver.implicitly_wait(.1)
 
 def get_num_cookies(seldriver):
-    elem_num_cookies = seldriver.find_element(By.ID, "cookies")
-    match = re.search(r'(\d{1,3}(?:,\d{3})*)', elem_num_cookies.text)
-    if match:
-        # Remove commas and convert to int
-        return int(match.group(1).replace(',', ''))
+    try:
+        elem_num_cookies = seldriver.find_element(By.ID, "cookies")
+        match = re.search(r'(\d{1,3}(?:,\d{3})*)', elem_num_cookies.text)
+        if match:
+            # Remove commas and convert to int
+            return int(match.group(1).replace(',', ''))
+    except Exception:
+        pass
     return None
 
 # keep the browser open after opening it
@@ -26,12 +43,12 @@ driver = webdriver.Chrome()
 driver.get("https://ozh.github.io/cookieclicker/")
 
 # allow the page to load
-time.sleep(2)
+driver.implicitly_wait(2)
 
 # click on the language
 elem_english_lang_btn = driver.find_element(By.ID, "langSelect-EN")
 elem_english_lang_btn.click()
-time.sleep(1)
+driver.implicitly_wait(2)
 
 # begin clicking on the cookie
 clicks_before_buy = 100
@@ -44,16 +61,13 @@ while True:
         most_expensive_upgrades_index = len(upgrades) - 1
         most_expensive_upgrade = driver.find_element(By.ID, value=f"product{most_expensive_upgrades_index}")
         if most_expensive_upgrade is not None:
-            num_cookies = get_num_cookies(driver)
-            print(f"You currently have {num_cookies} cookies")
             most_expensive_upgrade.click()
             print(f"You just purchased {most_expensive_upgrade.text}")
     except Exception:
         print("ignoring exception")
 
-    num_cookies = get_num_cookies(driver)
-    clicks_before_buy = int(clicks_before_buy * 1.015)
-    print(f"You now have {num_cookies} cookies; waiting {clicks_before_buy} clicks until next purchase attempt")
+    clicks_before_buy = int(clicks_before_buy * GROWTH_IN_CLICKS_BEFORE_NEXT_CLICK_PASS)
+    print(f"Waiting {clicks_before_buy} clicks until next purchase attempt")
 
 
 # close the browser when we're done using it
